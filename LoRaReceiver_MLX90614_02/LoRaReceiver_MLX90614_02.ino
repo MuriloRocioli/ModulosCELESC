@@ -1,0 +1,121 @@
+/* Heltec Automation Receive communication test example
+ *
+ * Function:
+ * 1. Receive the same frequency band lora signal program
+ *  
+ * Description:
+ * 
+ * HelTec AutoMation, Chengdu, China
+ * 成都惠利特自动化科技有限公司
+ * www.heltec.org
+ *
+ * this project also realess in GitHub:
+ * https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series
+ * */
+
+#include "LoRaWan_APP.h"
+#include "Arduino.h"
+
+
+#define RF_FREQUENCY                                868000000 // Hz
+
+#define TX_OUTPUT_POWER                             14        // dBm
+
+#define LORA_BANDWIDTH                              1         // [0: 125 kHz,
+                                                              //  1: 250 kHz,
+                                                              //  2: 500 kHz,
+                                                              //  3: Reserved]
+#define LORA_SPREADING_FACTOR                       7         // [SF7..SF12]
+#define LORA_CODINGRATE                             1         // [1: 4/5,
+                                                              //  2: 4/6,
+                                                              //  3: 4/7,
+                                                              //  4: 4/8]
+#define LORA_PREAMBLE_LENGTH                        8         // Same for Tx and Rx
+#define LORA_SYMBOL_TIMEOUT                         0         // Symbols
+#define LORA_FIX_LENGTH_PAYLOAD_ON                  false
+#define LORA_IQ_INVERSION_ON                        false
+
+
+#define RX_TIMEOUT_VALUE                            1000
+#define BUFFER_SIZE                                 30 // Define the payload size here
+
+char txpacket[BUFFER_SIZE];
+char rxpacket[BUFFER_SIZE];
+
+static RadioEvents_t RadioEvents;
+
+int16_t txNumber;
+
+int16_t rssi,rxSize;
+
+bool lora_idle = true;
+
+
+// MLX90614 - Infrared Temperature Sensor data
+struct MLXData{
+  int    count;
+  double tempAmbient;
+  double tempObject; 
+}; 
+
+// Armazenda os dados provindos do sensor
+struct MLXData tempSensorData; 
+
+
+
+double dataBuffer[3];
+
+
+void setup() {
+    Serial.begin(115200);
+    Mcu.begin(HELTEC_BOARD,SLOW_CLK_TPYE);
+    
+    txNumber=0;
+    rssi=0;
+  
+    RadioEvents.RxDone = OnRxDone;
+    Radio.Init( &RadioEvents );
+    Radio.SetChannel( RF_FREQUENCY );
+    Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
+                               LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
+                               LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
+                               0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
+}
+
+
+
+void loop()
+{
+  if(lora_idle)
+  {
+    lora_idle = false;
+    //Serial.println("into RX mode");
+    Radio.Rx(0);
+  }
+  Radio.IrqProcess( );
+}
+
+void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
+{
+  rssi=rssi;
+  
+  memcpy(dataBuffer, payload, size );
+  //rxpacket[size]='\0';
+  Radio.Sleep( );
+
+  Serial.printf("%0.0f; %0.4f; %0.4f;\t length: %d\n",
+                              (float) dataBuffer[0], 
+                              (float) dataBuffer[1],
+                              (float) dataBuffer[2],
+                              (int) size);  //start a package
+  
+  //Serial.printf("\r\n\n\t -> Received packet with rssi %d , length %d\r\n",rssi,rxSize);
+
+  //Serial.print((String) tempSensorData.count + " - \t");
+  //Serial.print("Temperatura Ambiente: " + (String) tempSensorData.tempAmbient + " [C];\t");
+  //Serial.println("Temperatura do Objeto: " + (String) tempSensorData.tempObject);
+
+  lora_idle = true;
+}
+
+
